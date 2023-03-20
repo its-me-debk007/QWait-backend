@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"github.com/its-me-debk007/QWait_backend/util"
 	"log"
+	"math"
 	"math/big"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -121,13 +121,29 @@ func JoinQueue(c *gin.Context) {
 		return
 	}
 
-	intPhoneNo, _ := strconv.Atoi(phoneNo)
-	int64PhoneNo := int64(intPhoneNo)
+	//intPhoneNo, _ := strconv.Atoi(phoneNo)
+	//int64PhoneNo := int64(intPhoneNo)
 
 	flag := false
-	for _, v := range store.Customers {
-		if v == int64PhoneNo {
+	idx, minLen := -1, math.MaxInt64
+	for i, counter := range store.Customers {
+
+		if minLen > len(counter) {
 			flag = true
+			minLen = len(counter)
+			idx = i
+		}
+
+		splitArray := strings.Split(counter, ",")
+
+		for _, no := range splitArray {
+			if no == phoneNo {
+				flag = true
+				break
+			}
+		}
+
+		if flag {
 			break
 		}
 	}
@@ -137,8 +153,9 @@ func JoinQueue(c *gin.Context) {
 		return
 	}
 
-	store.Customers = append(store.Customers, int64PhoneNo)
-	store.WaitingTime = store.AvgTimePerPerson * len(store.Customers)
+	store.Customers[idx] += "," + phoneNo
+	//store.WaitingTime = store.AvgTimePerPerson * len(store.Customers)
+	store.WaitingTime = -1
 
 	if err := database.DB.Save(&store); err.Error != nil {
 		log.Println("\n" + err.Error.Error() + "\n")
@@ -176,12 +193,20 @@ func LeaveQueue(c *gin.Context) {
 		return
 	}
 
-	flag, idx := false, -1
-	for i, v := range store.Customers {
-		no, _ := strconv.ParseInt(phoneNo, 10, 64)
-		if v == no {
-			flag = true
-			idx = i
+	flag, idxI, idxJ := false, -1, -1
+	for i := range store.Customers {
+		splitArray := strings.Split(store.Customers[i], ",")
+
+		for j := range splitArray {
+			if splitArray[j] == phoneNo {
+				flag = true
+				idxI = i
+				idxJ = j
+				break
+			}
+		}
+
+		if flag {
 			break
 		}
 	}
@@ -191,7 +216,12 @@ func LeaveQueue(c *gin.Context) {
 		return
 	}
 
-	store.Customers = append(store.Customers[:idx], store.Customers[idx+1:]...)
+	//store.Customers[idxI] = append(store.Customers[idxI][:idxJ], store.Customers[idxI][idxJ+1:]...)
+	newSplitArray := strings.Split(store.Customers[idxI], ",")
+	newSplitArray = append(newSplitArray[:idxJ], newSplitArray[idxJ+1:]...)
+
+	store.Customers[idxI] = strings.Join(newSplitArray, ",")
+
 	if err := database.DB.Save(&store); err.Error != nil {
 		log.Println("\n" + err.Error.Error() + "\n")
 
@@ -256,10 +286,17 @@ func Home(c *gin.Context) {
 		}
 
 		flag := false
-		for _, v := range store.Customers {
-			no, _ := strconv.ParseInt(phoneNo, 10, 64)
-			if v == no {
-				flag = true
+		for _, counter := range store.Customers {
+			splitArray := strings.Split(counter, ",")
+
+			for _, no := range splitArray {
+				if no == phoneNo {
+					flag = true
+					break
+				}
+			}
+
+			if flag {
 				break
 			}
 		}
