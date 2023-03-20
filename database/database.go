@@ -2,7 +2,7 @@ package database
 
 import (
 	"log"
-
+	"os"
 	"github.com/its-me-debk007/QWait_backend/model"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
