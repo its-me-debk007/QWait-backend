@@ -230,12 +230,29 @@ func Home(c *gin.Context) {
 		return
 	}
 
-	var stores, nearStores, joinedStores []model.Store
+	var stores, joinedStores, hospitalStores, bankStores, regCampStores, govtOfficeStores, ticketSystemStores []model.Store
 	database.DB.Find(&stores)
 
 	for _, store := range stores {
 		if dist := util.GetDistanceInKm(store.Latitude, store.Longitude, input.Latitude, input.Longitude); dist < util.NEAR_BY_DISTANCE {
-			nearStores = append(nearStores, store)
+
+			switch store.Category {
+
+			case "hospital":
+				hospitalStores = append(hospitalStores, store)
+
+			case "bank":
+				bankStores = append(bankStores, store)
+
+			case "registration_camp":
+				regCampStores = append(regCampStores, store)
+
+			case "govt_office":
+				govtOfficeStores = append(govtOfficeStores, store)
+
+			case "ticketing_system":
+				ticketSystemStores = append(ticketSystemStores, store)
+			}
 		}
 
 		flag := false
@@ -253,7 +270,11 @@ func Home(c *gin.Context) {
 	}
 
 	c.AbortWithStatusJSON(http.StatusOK, gin.H{
-		"joined_stores": joinedStores,
-		"near_stores":   nearStores,
+		"joined_stores":        joinedStores,
+		"hospital_stores":      hospitalStores,
+		"bank_stores":          bankStores,
+		"reg_camp_stores":      regCampStores,
+		"govt_office_stores":   govtOfficeStores,
+		"ticket_system_stores": ticketSystemStores,
 	})
 }
