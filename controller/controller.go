@@ -96,7 +96,7 @@ func JoinQueue(c *gin.Context) {
 
 	input := new(struct {
 		Latitude  float64 `json:"latitude"    binding:"required"`
-		Longitude float64 `json:"longitude"    binding:"required"`
+		Longitude float64 `json:"longitude"   binding:"required"`
 	})
 
 	if err := c.ShouldBindJSON(&input); err != nil {
