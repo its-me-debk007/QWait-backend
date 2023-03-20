@@ -8,7 +8,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/its-me-debk007/QWait_backend/database"
 	"github.com/its-me-debk007/QWait_backend/route"
-	"github.com/joho/godotenv"
 )
 
 // func init() {
