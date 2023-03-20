@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"github.com/its-me-debk007/QWait_backend/util"
 	"log"
+	"math"
 	"math/big"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -96,7 +96,7 @@ func JoinQueue(c *gin.Context) {
 
 	input := new(struct {
 		Latitude  float64 `json:"latitude"    binding:"required"`
-		Longitude float64 `json:"longitude"    binding:"required"`
+		Longitude float64 `json:"longitude"   binding:"required"`
 	})
 
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -116,18 +116,34 @@ func JoinQueue(c *gin.Context) {
 
 	log.Println(dist)
 
-	if dist > 2.5 {
+	if dist > util.NEAR_BY_DISTANCE {
 		c.AbortWithStatusJSON(http.StatusForbidden, model.Message{Message: "customer not around 2.5 km from counter"})
 		return
 	}
 
-	intPhoneNo, _ := strconv.Atoi(phoneNo)
-	int64PhoneNo := int64(intPhoneNo)
+	//intPhoneNo, _ := strconv.Atoi(phoneNo)
+	//int64PhoneNo := int64(intPhoneNo)
 
 	flag := false
-	for _, v := range store.Customers {
-		if v == int64PhoneNo {
+	idx, minLen := -1, math.MaxInt64
+	for i, counter := range store.Customers {
+
+		if minLen > len(counter) {
 			flag = true
+			minLen = len(counter)
+			idx = i
+		}
+
+		splitArray := strings.Split(counter, ",")
+
+		for _, no := range splitArray {
+			if no == phoneNo {
+				flag = true
+				break
+			}
+		}
+
+		if flag {
 			break
 		}
 	}
@@ -137,8 +153,9 @@ func JoinQueue(c *gin.Context) {
 		return
 	}
 
-	store.Customers = append(store.Customers, int64PhoneNo)
-	store.WaitingTime = store.AvgTimePerPerson * len(store.Customers)
+	store.Customers[idx] += "," + phoneNo
+	//store.WaitingTime = store.AvgTimePerPerson * len(store.Customers)
+	store.WaitingTime = -1
 
 	if err := database.DB.Save(&store); err.Error != nil {
 		log.Println("\n" + err.Error.Error() + "\n")
@@ -148,10 +165,8 @@ func JoinQueue(c *gin.Context) {
 	}
 
 	c.AbortWithStatusJSON(http.StatusOK, gin.H{
-		"customers":           len(store.Customers),
-		"waiting_time":        store.WaitingTime,
 		"avg_time_per_person": store.AvgTimePerPerson,
-		"profile_pic":         store.ProfilePic,
+		"customers":           store.Customers,
 	})
 }
 
@@ -178,12 +193,20 @@ func LeaveQueue(c *gin.Context) {
 		return
 	}
 
-	flag, idx := false, -1
-	for i, v := range store.Customers {
-		no, _ := strconv.ParseInt(phoneNo, 10, 64)
-		if v == no {
-			flag = true
-			idx = i
+	flag, idxI, idxJ := false, -1, -1
+	for i := range store.Customers {
+		splitArray := strings.Split(store.Customers[i], ",")
+
+		for j := range splitArray {
+			if splitArray[j] == phoneNo {
+				flag = true
+				idxI = i
+				idxJ = j
+				break
+			}
+		}
+
+		if flag {
 			break
 		}
 	}
@@ -193,7 +216,12 @@ func LeaveQueue(c *gin.Context) {
 		return
 	}
 
-	store.Customers = append(store.Customers[:idx], store.Customers[idx+1:]...)
+	//store.Customers[idxI] = append(store.Customers[idxI][:idxJ], store.Customers[idxI][idxJ+1:]...)
+	newSplitArray := strings.Split(store.Customers[idxI], ",")
+	newSplitArray = append(newSplitArray[:idxJ], newSplitArray[idxJ+1:]...)
+
+	store.Customers[idxI] = strings.Join(newSplitArray, ",")
+
 	if err := database.DB.Save(&store); err.Error != nil {
 		log.Println("\n" + err.Error.Error() + "\n")
 
@@ -201,5 +229,89 @@ func LeaveQueue(c *gin.Context) {
 		// return
 	}
 
-	c.AbortWithStatusJSON(http.StatusOK, model.Message{Message: "left the queue"})
+	c.AbortWithStatusJSON(http.StatusOK, gin.H{
+		"avg_time_per_person": store.AvgTimePerPerson,
+		"customers":           store.Customers,
+	})
+}
+
+func Home(c *gin.Context) {
+	header := c.GetHeader("Authorization")
+	if header == "" {
+		c.AbortWithStatusJSON(http.StatusUnauthorized, model.Message{Message: "no token provided"})
+		return
+	}
+
+	token := header[7:]
+
+	phoneNo, err := util.ParseToken(token)
+	if err != nil {
+		c.AbortWithStatusJSON(http.StatusUnauthorized, model.Message{Message: err.Error()})
+		return
+	}
+
+	input := new(struct {
+		Latitude  float64 `json:"latitude"    binding:"required"`
+		Longitude float64 `json:"longitude"   binding:"required"`
+	})
+
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": err.Error()})
+		return
+	}
+
+	var stores, joinedStores, hospitalStores, bankStores, regCampStores, govtOfficeStores, ticketSystemStores []model.Store
+	database.DB.Find(&stores)
+
+	for _, store := range stores {
+		if dist := util.GetDistanceInKm(store.Latitude, store.Longitude, input.Latitude, input.Longitude); dist < util.NEAR_BY_DISTANCE {
+
+			switch store.Category {
+
+			case "hospital":
+				hospitalStores = append(hospitalStores, store)
+
+			case "bank":
+				bankStores = append(bankStores, store)
+
+			case "registration_camp":
+				regCampStores = append(regCampStores, store)
+
+			case "govt_office":
+				govtOfficeStores = append(govtOfficeStores, store)
+
+			case "ticketing_system":
+				ticketSystemStores = append(ticketSystemStores, store)
+			}
+		}
+
+		flag := false
+		for _, counter := range store.Customers {
+			splitArray := strings.Split(counter, ",")
+
+			for _, no := range splitArray {
+				if no == phoneNo {
+					flag = true
+					break
+				}
+			}
+
+			if flag {
+				break
+			}
+		}
+
+		if flag {
+			joinedStores = append(joinedStores, store)
+		}
+	}
+
+	c.AbortWithStatusJSON(http.StatusOK, gin.H{
+		"joined_stores":        joinedStores,
+		"hospital_stores":      hospitalStores,
+		"bank_stores":          bankStores,
+		"reg_camp_stores":      regCampStores,
+		"govt_office_stores":   govtOfficeStores,
+		"ticket_system_stores": ticketSystemStores,
+	})
 }
