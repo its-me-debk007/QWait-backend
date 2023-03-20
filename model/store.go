@@ -6,7 +6,9 @@ import (
 
 type Store struct {
 	ID               uint          `gorm:"primaryKey;autoIncrement:true"    json:"id"`
+	Name             string        `json:"name"`
 	Location         string        `json:"location"`
+	Category         string        `json:"category"`
 	Latitude         float64       `json:"-"`
 	Longitude        float64       `json:"-"`
 	Counters         int           `json:"counters"`

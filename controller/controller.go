@@ -116,7 +116,7 @@ func JoinQueue(c *gin.Context) {
 
 	log.Println(dist)
 
-	if dist > 2.5 {
+	if dist > util.NEAR_BY_DISTANCE {
 		c.AbortWithStatusJSON(http.StatusForbidden, model.Message{Message: "customer not around 2.5 km from counter"})
 		return
 	}
@@ -148,10 +148,8 @@ func JoinQueue(c *gin.Context) {
 	}
 
 	c.AbortWithStatusJSON(http.StatusOK, gin.H{
-		"customers":           len(store.Customers),
-		"waiting_time":        store.WaitingTime,
 		"avg_time_per_person": store.AvgTimePerPerson,
-		"profile_pic":         store.ProfilePic,
+		"customers":           store.Customers,
 	})
 }
 
@@ -201,5 +199,61 @@ func LeaveQueue(c *gin.Context) {
 		// return
 	}
 
-	c.AbortWithStatusJSON(http.StatusOK, model.Message{Message: "left the queue"})
+	c.AbortWithStatusJSON(http.StatusOK, gin.H{
+		"avg_time_per_person": store.AvgTimePerPerson,
+		"customers":           store.Customers,
+	})
+}
+
+func Home(c *gin.Context) {
+	header := c.GetHeader("Authorization")
+	if header == "" {
+		c.AbortWithStatusJSON(http.StatusUnauthorized, model.Message{Message: "no token provided"})
+		return
+	}
+
+	token := header[7:]
+
+	phoneNo, err := util.ParseToken(token)
+	if err != nil {
+		c.AbortWithStatusJSON(http.StatusUnauthorized, model.Message{Message: err.Error()})
+		return
+	}
+
+	input := new(struct {
+		Latitude  float64 `json:"latitude"    binding:"required"`
+		Longitude float64 `json:"longitude"   binding:"required"`
+	})
+
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": err.Error()})
+		return
+	}
+
+	var stores, nearStores, joinedStores []model.Store
+	database.DB.Find(&stores)
+
+	for _, store := range stores {
+		if dist := util.GetDistanceInKm(store.Latitude, store.Longitude, input.Latitude, input.Longitude); dist < util.NEAR_BY_DISTANCE {
+			nearStores = append(nearStores, store)
+		}
+
+		flag := false
+		for _, v := range store.Customers {
+			no, _ := strconv.ParseInt(phoneNo, 10, 64)
+			if v == no {
+				flag = true
+				break
+			}
+		}
+
+		if flag {
+			joinedStores = append(joinedStores, store)
+		}
+	}
+
+	c.AbortWithStatusJSON(http.StatusOK, gin.H{
+		"joined_stores": joinedStores,
+		"near_stores":   nearStores,
+	})
 }

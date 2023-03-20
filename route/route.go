@@ -16,7 +16,7 @@ func SetupRoutes(app *gin.Engine) {
 
 		api.POST("/join/:id", controller.JoinQueue)
 		api.POST("/leave/:id", controller.LeaveQueue)
+		api.POST("/home", controller.Home)
 	}
 
-	controller.SetupSocketIO(app)
 }

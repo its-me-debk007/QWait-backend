@@ -12,7 +12,7 @@ func SetupSocketIO(app *gin.Engine) {
 
 	server.OnConnect("/", func(s socketio.Conn) error {
 		s.SetContext("")
-		log.Println("CONNECTED TO SOCKET IO", s.ID())
+		log.Println("CONNECTED TO SOCKET IO: ", s.ID())
 		return nil
 	})
 
