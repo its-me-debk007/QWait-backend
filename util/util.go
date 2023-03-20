@@ -8,6 +8,7 @@ import (
 	"github.com/its-me-debk007/QWait_backend/model"
 	"github.com/twilio/twilio-go"
 	api "github.com/twilio/twilio-go/rest/api/v2010"
+	"log"
 	"math"
 	"os"
 	"time"
@@ -53,6 +54,8 @@ func GenerateToken(username string, subject string, expirationTime time.Duration
 	if err != nil {
 		return token, err
 	}
+
+	log.Printf("Access Token is %s \n", token)
 
 	return token, nil
 }
