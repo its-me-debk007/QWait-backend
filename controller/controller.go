@@ -76,7 +76,7 @@ func Verify(c *gin.Context) {
 
 	//location := fmt.Sprintf("?access=%s", accessToken)
 
-	c.Redirect(http.StatusPermanentRedirect, "https://www.google.co.in")
+	c.Redirect(http.StatusPermanentRedirect, fmt.Sprintf("https://qwait.netlify.app?token=%v", accessToken))
 }
 
 func JoinQueue(c *gin.Context) {
